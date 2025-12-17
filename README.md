@@ -79,11 +79,11 @@ SkillSnap is a modern, full-stack portfolio and project tracker application. It 
 ---
 
 ## Documentation
-- [project.md](.github/project.md): Full technical documentation
-- [user-manual.md](Docs/5user-manual.md): Step-by-step user guide
+- [project.md](.github/instructions/project.instructions.md): Full technical documentation
+- [user-manual.md](Docs/user-manual.md): Step-by-step user guide
 - [architecture.md](Docs/architecture.md): Architecture and design
 - [build-summary.md](Docs/build-summary.md): Phase-by-phase progress
-- [.github/copilot-instructions.md](.github/copilot-instructions.md): AI agent guidance
+- [.github/copilot-instructions.md](.github/instructions/copilot-instructions.md): AI agent guidance
 
 ---
 
