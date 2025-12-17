@@ -1,0 +1,210 @@
+@page "/edit-project/{Id:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@using Blazored.LocalStorage
+@inject ProjectService ProjectService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Edit Project - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@(isLoading || isSubmitting)" Message="@(isLoading ? "Loading project..." : "Updating project...")" />
+
+<div class="container mt-4" style="@((isLoading || isSubmitting) ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Edit Project</h2>
+
+    @if (project == null && !isLoading)
+    {
+        <div class="alert alert-warning">Project not found.</div>
+        <button class="btn btn-secondary" @onclick="Cancel">Go Back</button>
+    }
+    else if (project != null)
+    {
+        <EditForm Model="@project" OnValidSubmit="@HandleSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="form-group mb-3">
+                <label for="title" class="form-label">Title:</label>
+                <InputText id="title" class="form-control" @bind-Value="project!.Title" @bind-Value:after="SaveDraft" placeholder="Enter project title" />
+                <ValidationMessage For="@(() => project.Title)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="description" class="form-label">Description:</label>
+                <InputTextArea id="description" class="form-control" rows="4" @bind-Value="project.Description" @bind-Value:after="SaveDraft" placeholder="Describe your project..." />
+                <ValidationMessage For="@(() => project.Description)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="imageUrl" class="form-label">Image URL:</label>
+                <InputText id="imageUrl" class="form-control" @bind-Value="project.ImageUrl" @bind-Value:after="SaveDraft" placeholder="https://example.com/project-image.jpg" />
+                <ValidationMessage For="@(() => project.ImageUrl)" />
+                <small class="form-text text-muted">Optional: Enter a URL to a project screenshot or image</small>
+            </div>
+
+            @if (!string.IsNullOrEmpty(project.ImageUrl))
+            {
+                <div class="mb-3">
+                    <label class="form-label">Current Image Preview:</label>
+                    <div>
+                        <img src="@project.ImageUrl" alt="@project.Title" class="img-thumbnail" style="max-width: 300px;" />
+                    </div>
+                </div>
+            }
+
+            <div class="btn-group-responsive">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    <i class="bi bi-check-circle me-1"></i>@(isSubmitting ? "Updating..." : "Update Project")
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="async () => await Cancel()" disabled="@isSubmitting">
+                    <i class="bi bi-x-circle me-1"></i>Cancel
+                </button>
+            </div>
+        </EditForm>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong>Success:</strong> @successMessage
+                <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Project? project;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private string DraftKey => $"edit_project_{Id}_draft";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProject();
+        await RestoreDraft();
+    }
+
+    private async Task RestoreDraft()
+    {
+        try
+        {
+            var draft = await LocalStorage.GetItemAsync<Project>(DraftKey);
+            if (draft != null && project != null)
+            {
+                // Restore draft values
+                project.Title = draft.Title;
+                project.Description = draft.Description;
+                project.ImageUrl = draft.ImageUrl;
+            }
+        }
+        catch
+        {
+            // Ignore errors loading draft
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        if (project != null)
+        {
+            try
+            {
+                await LocalStorage.SetItemAsync(DraftKey, project);
+            }
+            catch
+            {
+                // Ignore errors saving draft
+            }
+        }
+    }
+
+    private async Task LoadProject()
+    {
+        try
+        {
+            isLoading = true;
+            project = await ProjectService.GetProjectAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading project: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (project == null) return;
+
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await ProjectService.UpdateProjectAsync(Id, project);
+            
+            if (result)
+            {
+                successMessage = "Project updated successfully!";
+                await LocalStorage.RemoveItemAsync(DraftKey); // Clear draft
+                await Task.Delay(1500); // Brief delay to show success message
+                Navigation.NavigateTo($"/view-portfoliouser/{project.PortfolioUserId}");
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to update this project. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to update this project. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await LocalStorage.RemoveItemAsync(DraftKey);
+        if (project != null)
+        {
+            Navigation.NavigateTo($"/view-portfoliouser/{project.PortfolioUserId}");
+        }
+        else
+        {
+            Navigation.NavigateTo("/portfoliousers");
+        }
+    }
+}

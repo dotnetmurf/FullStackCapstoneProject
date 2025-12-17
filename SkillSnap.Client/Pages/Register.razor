@@ -1,0 +1,124 @@
+@page "/register"
+@using SkillSnap.Shared.DTOs
+@using SkillSnap.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Register - SkillSnap</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h2>Register</h2>
+
+        <EditForm Model="@registerRequest" OnValidSubmit="@HandleRegister">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group mb-3">
+                <label for="email" class="form-label">Email:</label>
+                <InputText id="email" @bind-Value="registerRequest.Email" class="form-control" placeholder="Enter your email" />
+                <ValidationMessage For="@(() => registerRequest.Email)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="password" class="form-label">Password:</label>
+                <InputText id="password" type="password" @bind-Value="registerRequest.Password" class="form-control" placeholder="Enter your password" />
+                <ValidationMessage For="@(() => registerRequest.Password)" />
+                <small class="form-text text-muted">Must contain uppercase, lowercase, and digit.</small>
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="confirmPassword" class="form-label">Confirm Password:</label>
+                <InputText id="confirmPassword" type="password" @bind-Value="registerRequest.ConfirmPassword" class="form-control" placeholder="Confirm your password" />
+                <ValidationMessage For="@(() => registerRequest.ConfirmPassword)" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mb-3" disabled="@isSubmitting">
+                @(isSubmitting ? "Registering..." : "Register")
+            </button>
+        </EditForm>
+
+        <div class="text-center">
+            <p>Already have an account? <a href="/login">Login here</a></p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong>Success:</strong> @successMessage
+                <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private RegisterRequest registerRequest = new();
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private async Task HandleRegister()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await AuthService.RegisterAsync(registerRequest);
+
+            if (result.Success)
+            {
+                successMessage = "Registration successful! Redirecting...";
+                await Task.Delay(500);
+                Navigation.NavigateTo("/portfoliousers");
+            }
+            else
+            {
+                errorMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}
+
+<style>
+    .register-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 70vh;
+    }
+
+    .register-card {
+        max-width: 400px;
+        width: 100%;
+        padding: 2rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .register-card h2 {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+</style>

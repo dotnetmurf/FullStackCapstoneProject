@@ -1,0 +1,316 @@
+@page "/view-portfoliouser/{Id:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@inject PortfolioUserService PortfolioUserService
+@inject ProjectService ProjectService
+@inject SkillService SkillService
+@inject NavigationManager Navigation
+
+<PageTitle>@(user?.Name ?? "Portfolio User") - SkillSnap</PageTitle>
+
+<div class="container mt-4">
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (user != null)
+    {
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
+                    <h2 class="mb-0">Portfolio Details</h2>
+                    <div class="btn-group-responsive">
+                        <button class="btn btn-warning me-2" 
+                                @onclick="EditUser"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top" 
+                                title="Edit profile information">
+                            <i class="bi bi-pencil me-1"></i>Edit
+                        </button>
+                        <button class="btn btn-secondary" 
+                                @onclick="GoBack"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top" 
+                                title="Return to portfolio user list">
+                            <i class="bi bi-arrow-left me-1"></i>Back
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12 col-lg-4 mb-4">
+                <div class="card">
+                    @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                    {
+                        <img src="@user.ProfileImageUrl" class="card-img-top" alt="@user.Name" style="max-height: 300px; height: auto; object-fit: cover;" />
+                    }
+                    else
+                    {
+                        <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 300px;">
+                            <i class="bi bi-person-circle text-white" style="font-size: 6rem;"></i>
+                        </div>
+                    }
+                    <div class="card-body">
+                        <h4 class="card-title">@user.Name</h4>
+                        <p class="card-text text-muted">@user.Bio</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-8">
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">
+                            <i class="bi bi-folder"></i> Projects
+                            <span class="badge bg-primary"
+                                  data-bs-toggle="tooltip" 
+                                  data-bs-placement="top" 
+                                  title="Total number of projects in this portfolio">
+                                @projects.Count
+                            </span>
+                        </h4>
+                        <button class="btn btn-success btn-sm" 
+                                @onclick="AddProject"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top" 
+                                title="Add a new project to this portfolio">
+                            <i class="bi bi-plus-circle"></i> Add Project
+                        </button>
+                    </div>
+                    @if (projects.Any())
+                    {
+                        <div class="row">
+                            @foreach (var project in projects)
+                            {
+                                <div class="col-12 col-sm-6 col-lg-6 mb-3">
+                                    <div class="card h-100">
+                                        @if (!string.IsNullOrEmpty(project.ImageUrl))
+                                        {
+                                            <img src="@project.ImageUrl" class="card-img-top" alt="@project.Title" style="height: 150px; object-fit: cover;" />
+                                        }
+                                        <div class="card-body">
+                                            <h5 class="card-title">@project.Title</h5>
+                                            <p class="card-text">@project.Description</p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-top-0">
+                                            <button class="btn btn-sm btn-outline-primary me-2" 
+                                                    @onclick="() => EditProject(project.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Edit project details">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    @onclick="() => DeleteProject(project.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Delete this project (cannot be undone)">
+                                                <i class="bi bi-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info" role="alert">
+                            <i class="bi bi-info-circle me-2"></i>No projects yet.
+                        </div>
+                    }
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">
+                            <i class="bi bi-star"></i> Skills
+                            <span class="badge bg-success"
+                                  data-bs-toggle="tooltip" 
+                                  data-bs-placement="top" 
+                                  title="Total number of skills in this portfolio">
+                                @skills.Count
+                            </span>
+                        </h4>
+                        <button class="btn btn-success btn-sm" 
+                                @onclick="AddSkill"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top" 
+                                title="Add a new skill to this portfolio">
+                            <i class="bi bi-plus-circle"></i> Add Skill
+                        </button>
+                    </div>
+                    @if (skills.Any())
+                    {
+                        <div class="row">
+                            @foreach (var skill in skills)
+                            {
+                                <div class="col-12 col-sm-6 col-lg-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">@skill.Name</h5>
+                                            @if (!string.IsNullOrEmpty(skill.Level))
+                                            {
+                                                <p class="card-text">
+                                                    <span class="badge bg-info">@skill.Level</span>
+                                                </p>
+                                            }
+                                        </div>
+                                        <div class="card-footer bg-transparent border-top-0">
+                                            <button class="btn btn-sm btn-outline-primary me-2" 
+                                                    @onclick="() => EditSkill(skill.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Edit skill details">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    @onclick="() => DeleteSkill(skill.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Delete this skill (cannot be undone)">
+                                                <i class="bi bi-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info" role="alert">
+                            <i class="bi bi-info-circle me-2"></i>No skills yet.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <h4 class="alert-heading">Error</h4>
+            <p>@errorMessage</p>
+            <hr>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="OnInitializedAsync">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                </button>
+                <button class="btn btn-secondary" @onclick="GoBack">
+                    <i class="bi bi-arrow-left me-1"></i> Go Back
+                </button>
+            </div>
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty" aria-label="Close"></button>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Not Found</h4>
+            <p>Portfolio user not found.</p>
+            <hr>
+            <button class="btn btn-secondary" @onclick="GoBack">
+                <i class="bi bi-arrow-left"></i> Go Back
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PortfolioUser? user;
+    private List<Project> projects = new();
+    private List<Skill> skills = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            user = await PortfolioUserService.GetPortfolioUserAsync(Id);
+
+            if (user == null)
+            {
+                errorMessage = $"Portfolio user with ID {Id} not found.";
+                return;
+            }
+
+            // Load projects for this user
+            var allProjects = await ProjectService.GetProjectsAsync();
+            projects = allProjects.Where(p => p.PortfolioUserId == Id).ToList();
+
+            // Load skills for this user
+            var allSkills = await SkillService.GetSkillsAsync();
+            skills = allSkills.Where(s => s.PortfolioUserId == Id).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading portfolio user: {ex.Message}";
+            Console.WriteLine($"Error in ViewPortfolioUser: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void EditUser()
+    {
+        Navigation.NavigateTo($"/edit-portfoliouser/{Id}");
+    }
+
+    private void EditProject(int projectId)
+    {
+        Navigation.NavigateTo($"/edit-project/{projectId}");
+    }
+
+    private void EditSkill(int skillId)
+    {
+        Navigation.NavigateTo($"/edit-skill/{skillId}");
+    }
+
+    private void DeleteProject(int projectId)
+    {
+        Navigation.NavigateTo($"/delete-project/{projectId}");
+    }
+
+    private void DeleteSkill(int skillId)
+    {
+        Navigation.NavigateTo($"/delete-skill/{skillId}");
+    }
+
+    private void AddProject()
+    {
+        Navigation.NavigateTo($"/add-project/{Id}");
+    }
+
+    private void AddSkill()
+    {
+        Navigation.NavigateTo($"/add-skill/{Id}");
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/portfoliousers");
+    }
+}

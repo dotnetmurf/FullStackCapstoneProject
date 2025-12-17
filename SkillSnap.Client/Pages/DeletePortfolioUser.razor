@@ -1,0 +1,138 @@
+@page "/delete-portfoliouser/{Id:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@inject PortfolioUserService PortfolioUserService
+@inject NavigationManager Navigation
+
+<PageTitle>Delete Portfolio User - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@(isLoading || isDeleting)" Message="@(isLoading ? "Loading user..." : "Deleting user...")" />
+
+<div class="container mt-4" style="@((isLoading || isDeleting) ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Delete Portfolio User</h2>
+
+    @if (user == null && !isLoading)
+    {
+        <div class="alert alert-warning">Portfolio user not found.</div>
+        <button class="btn btn-secondary" @onclick="Cancel">Go Back</button>
+    }
+    else if (user != null)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <h4 class="alert-heading">⚠️ Confirm Deletion</h4>
+            <p>Are you sure you want to delete this portfolio user? <strong>This action cannot be undone.</strong></p>
+            <p class="mb-0"><strong>All associated projects and skills will also be deleted.</strong></p>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header bg-danger text-white">
+                <h5>User to be deleted:</h5>
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(user!.ProfileImageUrl))
+                {
+                    <img src="@user.ProfileImageUrl" alt="@user.Name" class="img-thumbnail mb-3" style="max-width: 200px;" />
+                }
+                <h5 class="card-title">@user.Name</h5>
+                <p class="card-text">@user.Bio</p>
+                <dl class="row">
+                    <dt class="col-12 col-md-3">User ID:</dt>
+                    <dd class="col-12 col-md-9">@user.Id</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="btn-group-responsive">
+            <button class="btn btn-danger" @onclick="HandleDelete" disabled="@isDeleting">
+                <i class="bi bi-trash me-1"></i>@(isDeleting ? "Deleting..." : "Yes, Delete Portfolio User")
+            </button>
+            <button class="btn btn-secondary" @onclick="Cancel" disabled="@isDeleting">
+                <i class="bi bi-arrow-left me-1"></i>Cancel
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PortfolioUser? user;
+    private bool isLoading = true;
+    private bool isDeleting = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUser();
+    }
+
+    private async Task LoadUser()
+    {
+        try
+        {
+            isLoading = true;
+            user = await PortfolioUserService.GetPortfolioUserAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading user: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        isDeleting = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await PortfolioUserService.DeletePortfolioUserAsync(Id);
+            
+            if (result)
+            {
+                Navigation.NavigateTo("/portfoliousers");
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to delete this portfolio user. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to delete this portfolio user. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo($"/view-portfoliouser/{Id}");
+    }
+}

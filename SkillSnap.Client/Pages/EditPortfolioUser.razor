@@ -1,0 +1,193 @@
+@page "/edit-portfoliouser/{Id:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@using Blazored.LocalStorage
+@inject PortfolioUserService PortfolioUserService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Edit Portfolio User - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@(isLoading || isSubmitting)" Message="@(isLoading ? "Loading user..." : "Updating user...")" />
+
+<div class="container mt-4" style="@((isLoading || isSubmitting) ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Edit Portfolio User</h2>
+
+    @if (user == null && !isLoading)
+    {
+        <div class="alert alert-warning">Portfolio user not found.</div>
+        <button class="btn btn-secondary" @onclick="Cancel">Go Back</button>
+    }
+    else if (user != null)
+    {
+        <EditForm Model="@user" OnValidSubmit="@HandleSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="form-group mb-3">
+                <label for="name" class="form-label">Name:</label>
+                <InputText id="name" class="form-control" @bind-Value="user!.Name" @bind-Value:after="SaveDraft" placeholder="Enter full name" />
+                <ValidationMessage For="@(() => user.Name)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="bio" class="form-label">Bio:</label>
+                <InputTextArea id="bio" class="form-control" rows="4" @bind-Value="user.Bio" @bind-Value:after="SaveDraft" placeholder="Tell us about yourself..." />
+                <ValidationMessage For="@(() => user.Bio)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="imageUrl" class="form-label">Profile Image URL:</label>
+                <InputText id="imageUrl" class="form-control" @bind-Value="user.ProfileImageUrl" @bind-Value:after="SaveDraft" placeholder="https://example.com/image.jpg" />
+                <ValidationMessage For="@(() => user.ProfileImageUrl)" />
+                <small class="form-text text-muted">Optional: Enter a URL to a profile image</small>
+            </div>
+
+            <div class="btn-group-responsive">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    <i class="bi bi-check-circle me-1"></i>@(isSubmitting ? "Updating..." : "Update Portfolio User")
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="async () => await Cancel()" disabled="@isSubmitting">
+                    <i class="bi bi-x-circle me-1"></i>Cancel
+                </button>
+            </div>
+        </EditForm>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong>Success:</strong> @successMessage
+                <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PortfolioUser? user;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private string DraftKey => $"edit_portfoliouser_{Id}_draft";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUser();
+        await RestoreDraft();
+    }
+
+    private async Task RestoreDraft()
+    {
+        try
+        {
+            var draft = await LocalStorage.GetItemAsync<PortfolioUser>(DraftKey);
+            if (draft != null && user != null)
+            {
+                // Restore draft values
+                user.Name = draft.Name;
+                user.Bio = draft.Bio;
+                user.ProfileImageUrl = draft.ProfileImageUrl;
+            }
+        }
+        catch
+        {
+            // Ignore errors loading draft
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        if (user != null)
+        {
+            try
+            {
+                await LocalStorage.SetItemAsync(DraftKey, user);
+            }
+            catch
+            {
+                // Ignore errors saving draft
+            }
+        }
+    }
+
+    private async Task LoadUser()
+    {
+        try
+        {
+            isLoading = true;
+            user = await PortfolioUserService.GetPortfolioUserAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading user: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (user == null) return;
+
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await PortfolioUserService.UpdatePortfolioUserAsync(Id, user);
+            
+            if (result)
+            {
+                successMessage = "Portfolio user updated successfully!";
+                await LocalStorage.RemoveItemAsync(DraftKey); // Clear draft
+                await Task.Delay(1500); // Brief delay to show success message
+                Navigation.NavigateTo($"/view-portfoliouser/{Id}");
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to update this portfolio user. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to update this portfolio user. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await LocalStorage.RemoveItemAsync(DraftKey);
+        Navigation.NavigateTo($"/view-portfoliouser/{Id}");
+    }
+}

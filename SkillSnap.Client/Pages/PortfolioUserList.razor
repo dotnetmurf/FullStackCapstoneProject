@@ -1,0 +1,513 @@
+@page "/portfoliousers"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@using Blazored.LocalStorage
+@inject PortfolioUserService PortfolioUserService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Portfolio Users - SkillSnap</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
+        <h2 class="mb-0">Portfolio Users</h2>
+        <button class="btn btn-primary" 
+                @onclick="NavigateToAdd"
+                data-bs-toggle="tooltip" 
+                data-bs-placement="left" 
+                title="Create a new portfolio user profile">
+            <i class="bi bi-person-plus-fill me-2"></i>Add New User
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading portfolio users...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading portfolio users...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <h4 class="alert-heading">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>Error Loading Users
+            </h4>
+            <p class="mb-0">@errorMessage</p>
+            <hr>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-danger" 
+                        @onclick="RetryLoad"
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Attempt to reload the data">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="GoHome">
+                    <i class="bi bi-house me-1"></i>Go Home
+                </button>
+            </div>
+            <button type="button" class="btn-close" @onclick="ClearError" aria-label="Close"></button>
+        </div>
+    }
+    else if (portfolioUsers == null || !portfolioUsers.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">
+                <i class="bi bi-info-circle-fill me-2"></i>No Portfolio Users Found
+            </h4>
+            <p>There are currently no portfolio users in the system.</p>
+            <hr>
+            <button class="btn btn-primary" @onclick="NavigateToAdd">
+                <i class="bi bi-person-plus-fill me-2"></i>Create Your First Portfolio User
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill me-2"></i>
+                    All Portfolio Users (@totalUsers total)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3 g-3">
+                    <div class="col-12 col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Search users by name..." 
+                                   @bind="searchTerm"
+                                   @bind:event="oninput"
+                                   @onkeyup="FilterUsers" />
+                            @if (!string.IsNullOrEmpty(searchTerm))
+                            {
+                                <button class="btn btn-outline-secondary" 
+                                        @onclick="ClearSearch"
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top" 
+                                        title="Clear search filter">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="btn-group w-100 w-md-auto" role="group">
+                            <button type="button" 
+                                    class="btn @(viewMode == "grid" ? "btn-primary" : "btn-outline-primary")" 
+                                    @onclick='async () => await SetViewMode("grid")'
+                                    data-bs-toggle="tooltip" 
+                                    data-bs-placement="top" 
+                                    title="Display users in a card grid layout">
+                                <i class="bi bi-grid-3x3-gap-fill"></i> Grid
+                            </button>
+                            <button type="button" 
+                                    class="btn @(viewMode == "list" ? "btn-primary" : "btn-outline-primary")" 
+                                    @onclick='async () => await SetViewMode("list")'
+                                    data-bs-toggle="tooltip" 
+                                    data-bs-placement="top" 
+                                    title="Display users in a table list layout">
+                                <i class="bi bi-list-ul"></i> List
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                @if (filteredUsers.Any())
+                {
+                    @if (viewMode == "grid")
+                    {
+                        <div class="row">
+                            @foreach (var user in filteredUsers)
+                            {
+                                <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
+                                    <div class="card h-100 shadow-sm hover-shadow">
+                                        @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                                        {
+                                            <img src="@user.ProfileImageUrl" 
+                                                 class="card-img-top" 
+                                                 alt="@user.Name" 
+                                                 style="height: 200px; object-fit: cover;" />
+                                        }
+                                        else
+                                        {
+                                            <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" 
+                                                 style="height: 200px;">
+                                                <i class="bi bi-person-circle text-white" style="font-size: 5rem;"></i>
+                                            </div>
+                                        }
+                                        <div class="card-body d-flex flex-column">
+                                            <h5 class="card-title">@user.Name</h5>
+                                            <p class="card-text text-muted flex-grow-1">
+                                                @(user.Bio.Length > 100 ? user.Bio.Substring(0, 100) + "..." : user.Bio)
+                                            </p>
+                                            <div class="d-flex gap-2 mt-2">
+                                                <button class="btn btn-sm btn-primary flex-fill" 
+                                                        @onclick="() => ViewProfile(user.Id)"
+                                                        data-bs-toggle="tooltip" 
+                                                        data-bs-placement="top" 
+                                                        title="View @user.Name's portfolio details">
+                                                    <i class="bi bi-eye me-1"></i>View
+                                                </button>
+                                                <button class="btn btn-sm btn-warning" 
+                                                        @onclick="() => EditProfile(user.Id)"
+                                                        data-bs-toggle="tooltip" 
+                                                        data-bs-placement="top" 
+                                                        title="Edit @user.Name's profile">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" 
+                                                        @onclick="() => DeleteProfile(user.Id)"
+                                                        data-bs-toggle="tooltip" 
+                                                        data-bs-placement="top" 
+                                                        title="Delete @user.Name's profile">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="list-group">
+                            @foreach (var user in filteredUsers)
+                            {
+                                <div class="list-group-item list-group-item-action">
+                                    <!-- Desktop Layout: Horizontal (≥768px) -->
+                                    <div class="d-none d-md-flex w-100 justify-content-between align-items-center">
+                                        <div class="d-flex gap-3 align-items-center flex-grow-1 overflow-hidden">
+                                            @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                                            {
+                                                <img src="@user.ProfileImageUrl" 
+                                                     alt="@user.Name" 
+                                                     class="rounded-circle flex-shrink-0" 
+                                                     style="width: 70px; height: 70px; object-fit: cover;" />
+                                            }
+                                            else
+                                            {
+                                                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center flex-shrink-0" 
+                                                     style="width: 70px; height: 70px; min-width: 70px;">
+                                                    <i class="bi bi-person-circle text-white" style="font-size: 2.2rem;"></i>
+                                                </div>
+                                            }
+                                            <div class="flex-grow-1 overflow-hidden">
+                                                <h5 class="mb-1 text-truncate">@user.Name</h5>
+                                                <p class="mb-1 text-muted text-truncate">@user.Bio</p>
+                                                <small class="text-muted">User ID: @user.Id</small>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-2 flex-shrink-0 ms-3">
+                                            <!-- Medium screens (768-1199px): Icon-only buttons -->
+                                            <button class="btn btn-primary d-xl-none" 
+                                                    @onclick="() => ViewProfile(user.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="View @user.Name's portfolio details">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="btn btn-warning d-xl-none" 
+                                                    @onclick="() => EditProfile(user.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Edit @user.Name's profile information">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-danger d-xl-none" 
+                                                    @onclick="() => DeleteProfile(user.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Delete @user.Name's profile permanently">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            
+                                            <!-- Large screens (≥1200px): Buttons with text -->
+                                            <button class="btn btn-primary d-none d-xl-inline-block" 
+                                                    @onclick="() => ViewProfile(user.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="View @user.Name's portfolio details">
+                                                <i class="bi bi-eye me-1"></i>View
+                                            </button>
+                                            <button class="btn btn-warning d-none d-xl-inline-block" 
+                                                    @onclick="() => EditProfile(user.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Edit @user.Name's profile information">
+                                                <i class="bi bi-pencil me-1"></i>Edit
+                                            </button>
+                                            <button class="btn btn-danger d-none d-xl-inline-block" 
+                                                    @onclick="() => DeleteProfile(user.Id)"
+                                                    data-bs-toggle="tooltip" 
+                                                    data-bs-placement="top" 
+                                                    title="Delete @user.Name's profile permanently">
+                                                <i class="bi bi-trash me-1"></i>Delete
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mobile Layout: Stacked (<768px) -->
+                                    <div class="d-md-none">
+                                        <div class="d-flex gap-3 mb-3">
+                                            @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                                            {
+                                                <img src="@user.ProfileImageUrl" 
+                                                     alt="@user.Name" 
+                                                     class="rounded-circle flex-shrink-0" 
+                                                     style="width: 60px; height: 60px; object-fit: cover;" />
+                                            }
+                                            else
+                                            {
+                                                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center flex-shrink-0" 
+                                                     style="width: 60px; height: 60px;">
+                                                    <i class="bi bi-person-circle text-white" style="font-size: 2rem;"></i>
+                                                </div>
+                                            }
+                                            <div class="flex-grow-1 min-w-0">
+                                                <h5 class="mb-1">@user.Name</h5>
+                                                <p class="mb-1 text-muted small">@(user.Bio.Length > 60 ? user.Bio.Substring(0, 60) + "..." : user.Bio)</p>
+                                                <small class="text-muted">ID: @user.Id</small>
+                                            </div>
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                            <button class="btn btn-primary btn-sm" 
+                                                    @onclick="() => ViewProfile(user.Id)">
+                                                <i class="bi bi-eye me-1"></i>View Profile
+                                            </button>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-warning btn-sm" 
+                                                        @onclick="() => EditProfile(user.Id)">
+                                                    <i class="bi bi-pencil me-1"></i>Edit
+                                                </button>
+                                                <button class="btn btn-danger btn-sm" 
+                                                        @onclick="() => DeleteProfile(user.Id)">
+                                                    <i class="bi bi-trash me-1"></i>Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-search me-2"></i>
+                        No users found matching "<strong>@searchTerm</strong>"
+                    </div>
+                }
+
+                @* Pagination Controls *@
+                @if (string.IsNullOrWhiteSpace(searchTerm) && pagedResult != null && pagedResult.TotalPages > 1)
+                {
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <label class="me-2">Items per page:</label>
+                            <select class="form-select form-select-sm d-inline-block w-auto" @bind="pageSize" @bind:after="OnPageSizeChanged">
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <Pagination CurrentPage="@currentPage"
+                                    TotalItems="@pagedResult.TotalCount"
+                                    PageSize="@pagedResult.PageSize"
+                                    OnPageChanged="LoadPage" />
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="ClearSuccess" aria-label="Close"></button>
+        </div>
+    }
+</div>
+
+<style>
+    .hover-shadow {
+        transition: box-shadow 0.3s ease-in-out;
+    }
+
+    .hover-shadow:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .card-img-top {
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .card:hover .card-img-top {
+        transform: scale(1.05);
+    }
+</style>
+
+@code {
+    private List<PortfolioUser>? portfolioUsers;
+    private List<PortfolioUser> filteredUsers = new();
+    private PagedResult<PortfolioUser>? pagedResult;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string searchTerm = string.Empty;
+    private string viewMode = "grid";
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalUsers = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Restore view mode from LocalStorage
+        var savedViewMode = await LocalStorage.GetItemAsStringAsync("portfolioUsersViewMode");
+        if (!string.IsNullOrEmpty(savedViewMode))
+        {
+            viewMode = savedViewMode;
+        }
+        
+        await LoadPortfolioUsers();
+    }
+
+    private async Task LoadPortfolioUsers()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            // Use paginated endpoint for better performance
+            pagedResult = await PortfolioUserService.GetPortfolioUsersPagedAsync(currentPage, pageSize);
+            
+            if (pagedResult != null)
+            {
+                portfolioUsers = pagedResult.Items;
+                filteredUsers = portfolioUsers;
+                totalUsers = pagedResult.TotalCount;
+            }
+            else
+            {
+                portfolioUsers = new List<PortfolioUser>();
+                filteredUsers = new List<PortfolioUser>();
+                totalUsers = 0;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Network error: Unable to connect to the server. Please check your connection and try again.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading portfolio users: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPage(int page)
+    {
+        currentPage = page;
+        await LoadPortfolioUsers();
+    }
+
+    private async Task OnPageSizeChanged()
+    {
+        currentPage = 1; // Reset to first page when page size changes
+        await LoadPortfolioUsers();
+    }
+
+    private void FilterUsers()
+    {
+        if (portfolioUsers == null)
+        {
+            filteredUsers = new List<PortfolioUser>();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredUsers = portfolioUsers;
+        }
+        else
+        {
+            filteredUsers = portfolioUsers
+                .Where(u => u.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                           u.Bio.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    private void ClearSearch()
+    {
+        searchTerm = string.Empty;
+        FilterUsers();
+    }
+
+    private async Task SetViewMode(string mode)
+    {
+        viewMode = mode;
+        // Save view mode to LocalStorage
+        await LocalStorage.SetItemAsStringAsync("portfolioUsersViewMode", mode);
+    }
+
+    private async Task RetryLoad()
+    {
+        await LoadPortfolioUsers();
+    }
+
+    private void ClearError()
+    {
+        errorMessage = string.Empty;
+    }
+
+    private void ClearSuccess()
+    {
+        successMessage = string.Empty;
+    }
+
+    private void NavigateToAdd()
+    {
+        Navigation.NavigateTo("/add-portfoliouser");
+    }
+
+    private void ViewProfile(int id)
+    {
+        Navigation.NavigateTo($"/view-portfoliouser/{id}");
+    }
+
+    private void EditProfile(int id)
+    {
+        Navigation.NavigateTo($"/edit-portfoliouser/{id}");
+    }
+
+    private void DeleteProfile(int id)
+    {
+        Navigation.NavigateTo($"/delete-portfoliouser/{id}");
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+}

@@ -1,0 +1,223 @@
+@page "/add-project"
+@page "/add-project/{PortfolioUserId:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@using Blazored.LocalStorage
+@inject ProjectService ProjectService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Add Project - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@isSubmitting" Message="Adding project..." />
+
+<div class="container mt-4" style="@(isSubmitting ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Add Project</h2>
+
+    <EditForm Model="@newProject" OnValidSubmit="@HandleSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group mb-3">
+            <label for="title" class="form-label">Title:</label>
+            <InputText id="title" class="form-control" @bind-Value="newProject.Title" @bind-Value:after="SaveDraft" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="description" class="form-label">Description:</label>
+            <InputTextArea id="description" class="form-control" rows="4" @bind-Value="newProject.Description" @bind-Value:after="SaveDraft" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="imageUrl" class="form-label">
+                Image URL:
+                <i class="bi bi-info-circle ms-1" 
+                   data-bs-toggle="tooltip" 
+                   data-bs-placement="right" 
+                   title="Optional: Enter a URL to a project screenshot or logo"></i>
+            </label>
+            <InputText id="imageUrl" class="form-control" @bind-Value="newProject.ImageUrl" @bind-Value:after="SaveDraft" placeholder="https://example.com/project-image.jpg" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="portfolioUserId" class="form-label">
+                Portfolio User ID:
+                @if (PortfolioUserId.HasValue)
+                {
+                    <i class="bi bi-lock-fill ms-1" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="right" 
+                       title="This project is linked to a specific portfolio user and cannot be changed"></i>
+                }
+                else
+                {
+                    <i class="bi bi-info-circle ms-1" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="right" 
+                       title="Enter the ID of the portfolio user this project belongs to"></i>
+                }
+            </label>
+            <InputNumber id="portfolioUserId" class="form-control" @bind-Value="newProject.PortfolioUserId" readonly="@(PortfolioUserId.HasValue)" disabled="@(PortfolioUserId.HasValue)" />
+        </div>
+
+        <div class="btn-group-responsive">
+            <button type="submit" 
+                    class="btn btn-primary" 
+                    disabled="@isSubmitting"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="Save new project and navigate to portfolio details">
+                <i class="bi bi-check-circle me-1"></i>@(isSubmitting ? "Adding..." : "Add Project")
+            </button>
+            <button type="button" 
+                    class="btn btn-secondary" 
+                    @onclick="async () => await Cancel()" 
+                    disabled="@isSubmitting"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="Discard changes and return to previous page">
+                <i class="bi bi-x-circle me-1"></i>Cancel
+            </button>
+        </div>
+    </EditForm>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <strong>Error:</strong> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Success:</strong> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? PortfolioUserId { get; set; }
+
+    private Project newProject = new() { PortfolioUserId = 1 }; // Default to first user
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private string DraftKey => PortfolioUserId.HasValue 
+        ? $"add_project_{PortfolioUserId.Value}_draft" 
+        : "add_project_draft";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (PortfolioUserId.HasValue)
+        {
+            newProject.PortfolioUserId = PortfolioUserId.Value;
+        }
+        await RestoreDraft();
+    }
+
+    private async Task RestoreDraft()
+    {
+        try
+        {
+            var draft = await LocalStorage.GetItemAsync<Project>(DraftKey);
+            if (draft != null)
+            {
+                // Restore draft values
+                newProject.Title = draft.Title;
+                newProject.Description = draft.Description;
+                newProject.ImageUrl = draft.ImageUrl;
+                // Only restore PortfolioUserId if not passed as parameter
+                if (!PortfolioUserId.HasValue)
+                {
+                    newProject.PortfolioUserId = draft.PortfolioUserId;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore errors loading draft
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        try
+        {
+            await LocalStorage.SetItemAsync(DraftKey, newProject);
+        }
+        catch
+        {
+            // Ignore errors saving draft
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await ProjectService.AddProjectAsync(newProject);
+            
+            if (result != null)
+            {
+                successMessage = "Project added successfully!";
+                await LocalStorage.RemoveItemAsync(DraftKey); // Clear draft
+                
+                // Wait a moment to show success message, then navigate
+                await Task.Delay(1500);
+                if (PortfolioUserId.HasValue)
+                {
+                    Navigation.NavigateTo($"/view-portfoliouser/{PortfolioUserId.Value}");
+                }
+                else
+                {
+                    Navigation.NavigateTo("/portfoliousers");
+                }
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to add a project. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to add a project. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await LocalStorage.RemoveItemAsync(DraftKey);
+        if (PortfolioUserId.HasValue)
+        {
+            Navigation.NavigateTo($"/view-portfoliouser/{PortfolioUserId.Value}");
+        }
+        else
+        {
+            Navigation.NavigateTo("/portfoliousers");
+        }
+    }
+}

@@ -1,0 +1,96 @@
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@inject PortfolioUserService PortfolioUserService
+@inject NavigationManager Navigation
+
+<div class="profile-list">
+    <h3>Portfolio Users</h3>
+
+    @if (isLoading)
+    {
+        <p><em>Loading portfolio users...</em></p>
+    }
+    else if (portfolioUsers == null || !portfolioUsers.Any())
+    {
+        <p><em>No portfolio users to display yet.</em></p>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var user in portfolioUsers)
+            {
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                        {
+                            <img src="@user.ProfileImageUrl" class="card-img-top" alt="@user.Name" style="height: 200px; object-fit: cover;" />
+                        }
+                        <div class="card-body">
+                            <h5 class="card-title">@user.Name</h5>
+                            <p class="card-text">@user.Bio</p>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-primary" @onclick="() => ViewProfile(user.Id)">
+                                    View
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => EditProfile(user.Id)">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteProfile(user.Id)">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-3">@errorMessage</div>
+    }
+</div>
+
+@code {
+    private List<PortfolioUser>? portfolioUsers;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPortfolioUsers();
+    }
+
+    private async Task LoadPortfolioUsers()
+    {
+        try
+        {
+            isLoading = true;
+            portfolioUsers = await PortfolioUserService.GetPortfolioUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading portfolio users: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ViewProfile(int id)
+    {
+        Navigation.NavigateTo($"/view-portfoliouser/{id}", forceLoad: false);
+    }
+
+    private void EditProfile(int id)
+    {
+        Navigation.NavigateTo($"/edit-portfoliouser/{id}", forceLoad: false);
+    }
+
+    private void DeleteProfile(int id)
+    {
+        Navigation.NavigateTo($"/delete-portfoliouser/{id}", forceLoad: false);
+    }
+}

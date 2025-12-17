@@ -1,0 +1,190 @@
+@page "/add-skill"
+@page "/add-skill/{PortfolioUserId:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@using Blazored.LocalStorage
+@inject SkillService SkillService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Add Skill - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@isSubmitting" Message="Adding skill..." />
+
+<div class="container mt-4" style="@(isSubmitting ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Add Skill</h2>
+
+    <EditForm Model="@newSkill" OnValidSubmit="@HandleSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group mb-3">
+            <label for="name" class="form-label">Skill Name:</label>
+            <InputText id="name" class="form-control" @bind-Value="newSkill.Name" @bind-Value:after="SaveDraft" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="level" class="form-label">Skill Level:</label>
+            <InputSelect id="level" class="form-control" @bind-Value="newSkill.Level" @bind-Value:after="SaveDraft">
+                <option value="">-- Select Level --</option>
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+                <option value="Expert">Expert</option>
+            </InputSelect>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="portfolioUserId" class="form-label">Portfolio User ID:</label>
+            <InputNumber id="portfolioUserId" class="form-control" @bind-Value="newSkill.PortfolioUserId" readonly="@(PortfolioUserId.HasValue)" disabled="@(PortfolioUserId.HasValue)" />
+        </div>
+
+        <div class="btn-group-responsive">
+            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                <i class="bi bi-check-circle me-1"></i>@(isSubmitting ? "Adding..." : "Add Skill")
+            </button>
+            <button type="button" class="btn btn-secondary" @onclick="async () => await Cancel()" disabled="@isSubmitting">
+                <i class="bi bi-x-circle me-1"></i>Cancel
+            </button>
+        </div>
+    </EditForm>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <strong>Error:</strong> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Success:</strong> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? PortfolioUserId { get; set; }
+
+    private Skill newSkill = new() { PortfolioUserId = 1 }; // Default to first user
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private string DraftKey => PortfolioUserId.HasValue 
+        ? $"add_skill_{PortfolioUserId.Value}_draft" 
+        : "add_skill_draft";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (PortfolioUserId.HasValue)
+        {
+            newSkill.PortfolioUserId = PortfolioUserId.Value;
+        }
+        await RestoreDraft();
+    }
+
+    private async Task RestoreDraft()
+    {
+        try
+        {
+            var draft = await LocalStorage.GetItemAsync<Skill>(DraftKey);
+            if (draft != null)
+            {
+                // Restore draft values
+                newSkill.Name = draft.Name;
+                newSkill.Level = draft.Level;
+                // Only restore PortfolioUserId if not passed as parameter
+                if (!PortfolioUserId.HasValue)
+                {
+                    newSkill.PortfolioUserId = draft.PortfolioUserId;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore errors loading draft
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        try
+        {
+            await LocalStorage.SetItemAsync(DraftKey, newSkill);
+        }
+        catch
+        {
+            // Ignore errors saving draft
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await SkillService.AddSkillAsync(newSkill);
+            
+            if (result != null)
+            {
+                successMessage = "Skill added successfully!";
+                await LocalStorage.RemoveItemAsync(DraftKey); // Clear draft
+                
+                // Wait a moment to show success message, then navigate
+                await Task.Delay(1500);
+                if (PortfolioUserId.HasValue)
+                {
+                    Navigation.NavigateTo($"/view-portfoliouser/{PortfolioUserId.Value}");
+                }
+                else
+                {
+                    Navigation.NavigateTo("/portfoliousers");
+                }
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to add a skill. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to add a skill. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await LocalStorage.RemoveItemAsync(DraftKey);
+        if (PortfolioUserId.HasValue)
+        {
+            Navigation.NavigateTo($"/view-portfoliouser/{PortfolioUserId.Value}");
+        }
+        else
+        {
+            Navigation.NavigateTo("/portfoliousers");
+        }
+    }
+}

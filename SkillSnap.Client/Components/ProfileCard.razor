@@ -1,0 +1,25 @@
+@namespace SkillSnap.Client.Components
+
+<div class="card profile-card">
+    <div class="card-body">
+        <img src="@GetImageUrl()" alt="@Name" class="profile-image" />
+        <h3 class="profile-name">@Name</h3>
+        <p class="profile-bio">@Bio</p>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Bio { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ImageUrl { get; set; } = string.Empty;
+
+    private string GetImageUrl()
+    {
+        return string.IsNullOrEmpty(ImageUrl) ? "/images/default-profile.svg" : ImageUrl;
+    }
+}

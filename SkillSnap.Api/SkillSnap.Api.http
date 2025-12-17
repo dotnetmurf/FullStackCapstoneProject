@@ -1,0 +1,268 @@
+@SkillSnap.Api_HostAddress = http://localhost:5149
+# @token = your_jwt_token_here
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwY2MxZDI4OC01MmE0LTRmYzAtOWVlMy04YzUzZDlmYjYzODQiLCJlbWFpbCI6ImFkbWluQHNraWxsc25hcC5jb20iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW5Ac2tpbGxzbmFwLmNvbSIsImp0aSI6IjEyMGUwNjkyLWI5ODMtNDQxZS1hODcyLTI1YmM4YTZjNWY1YSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFkbWluIiwiZXhwIjoxNzY1NzU1NjE0LCJpc3MiOiJTa2lsbFNuYXBBcGkiLCJhdWQiOiJTa2lsbFNuYXBDbGllbnQifQ.Bbcudw4ekhOmxeNS5F-nKhVITedX0hyIkqwarICSuSc
+
+### ==================== AUTHENTICATION ====================
+
+### Register New User
+POST {{SkillSnap.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "Test123!",
+  "confirmPassword": "Test123!"
+}
+
+### Login
+POST {{SkillSnap.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@skillsnap.com",
+  "password": "Admin123!"
+}
+
+### Login as Test User
+POST {{SkillSnap.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "Test123!"
+}
+
+### ==================== PORTFOLIO USERS ====================
+
+### Get All Portfolio Users (Public)
+GET {{SkillSnap.Api_HostAddress}}/api/portfoliousers
+Accept: application/json
+
+### Get Portfolio User by ID (Public)
+GET {{SkillSnap.Api_HostAddress}}/api/portfoliousers/1
+Accept: application/json
+
+### Create Portfolio User (Requires Auth)
+POST {{SkillSnap.Api_HostAddress}}/api/portfoliousers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "John Doe",
+  "bio": "Full-stack developer with 5 years of experience in .NET and React",
+  "profileImageUrl": "https://via.placeholder.com/200"
+}
+
+### Update Portfolio User (Requires Auth)
+PUT {{SkillSnap.Api_HostAddress}}/api/portfoliousers/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "id": 1,
+  "name": "John Doe Updated",
+  "bio": "Senior Full-stack developer with 5+ years of experience",
+  "profileImageUrl": "https://via.placeholder.com/200"
+}
+
+### Delete Portfolio User (Requires Admin)
+DELETE {{SkillSnap.Api_HostAddress}}/api/portfoliousers/1
+Authorization: Bearer {{token}}
+
+### ==================== PROJECTS ====================
+
+### Get All Projects (Public)
+GET {{SkillSnap.Api_HostAddress}}/api/projects
+Accept: application/json
+
+### Get Project by ID (Public)
+GET {{SkillSnap.Api_HostAddress}}/api/projects/1
+Accept: application/json
+
+### Get Projects Summary (Public - Optimized DTO)
+GET {{SkillSnap.Api_HostAddress}}/api/projects/summary
+Accept: application/json
+
+### Create Project (Requires Auth)
+POST {{SkillSnap.Api_HostAddress}}/api/projects
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "E-Commerce Platform",
+  "description": "Full-featured e-commerce platform built with ASP.NET Core and Blazor WebAssembly",
+  "imageUrl": "https://via.placeholder.com/400x300",
+  "portfolioUserId": 1
+}
+
+### Update Project (Requires Auth)
+PUT {{SkillSnap.Api_HostAddress}}/api/projects/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "id": 1,
+  "title": "E-Commerce Platform - Updated",
+  "description": "Full-featured e-commerce platform with payment integration",
+  "imageUrl": "https://via.placeholder.com/400x300",
+  "portfolioUserId": 1
+}
+
+### Delete Project (Requires Admin)
+DELETE {{SkillSnap.Api_HostAddress}}/api/projects/1
+Authorization: Bearer {{token}}
+
+### ==================== SKILLS ====================
+
+### Get All Skills (Public)
+GET {{SkillSnap.Api_HostAddress}}/api/skills
+Accept: application/json
+
+### Get Skill by ID (Public)
+GET {{SkillSnap.Api_HostAddress}}/api/skills/1
+Accept: application/json
+
+### Create Skill (Requires Auth)
+POST {{SkillSnap.Api_HostAddress}}/api/skills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "C#",
+  "level": "Expert",
+  "portfolioUserId": 1
+}
+
+### Update Skill (Requires Auth)
+PUT {{SkillSnap.Api_HostAddress}}/api/skills/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "id": 1,
+  "name": "C# / .NET",
+  "level": "Expert",
+  "portfolioUserId": 1
+}
+
+### Delete Skill (Requires Admin)
+DELETE {{SkillSnap.Api_HostAddress}}/api/skills/1
+Authorization: Bearer {{token}}
+
+### ==================== SEED DATA ====================
+
+### Seed Initial Data (Development Only - Requires Admin Role)
+POST {{SkillSnap.Api_HostAddress}}/api/seed
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### ==================== TESTING SCENARIOS ====================
+
+### Scenario 1: Complete User Registration Flow
+# Step 1: Register
+POST {{SkillSnap.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "NewUser123!",
+  "confirmPassword": "NewUser123!"
+}
+
+### Scenario 2: Login and Create Portfolio
+# Step 1: Login (Copy token from response)
+POST {{SkillSnap.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "NewUser123!"
+}
+
+# Step 2: Create Portfolio User (Replace {{token}} with token from Step 1)
+POST {{SkillSnap.Api_HostAddress}}/api/portfoliousers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Jane Smith",
+  "bio": "Frontend developer specializing in React and Vue.js",
+  "profileImageUrl": "https://via.placeholder.com/200"
+}
+
+# Step 3: Create Projects (Use Portfolio User ID from Step 2)
+POST {{SkillSnap.Api_HostAddress}}/api/projects
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Portfolio Website",
+  "description": "Personal portfolio built with Blazor WebAssembly",
+  "imageUrl": "https://via.placeholder.com/400x300",
+  "portfolioUserId": 2
+}
+
+# Step 4: Create Skills (Use Portfolio User ID from Step 2)
+POST {{SkillSnap.Api_HostAddress}}/api/skills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Blazor",
+  "level": "Advanced",
+  "portfolioUserId": 2
+}
+
+### ==================== CACHE TESTING ====================
+
+### Test Cache - First Request (Cache Miss)
+GET {{SkillSnap.Api_HostAddress}}/api/projects
+Accept: application/json
+
+### Test Cache - Second Request (Cache Hit - Should be faster)
+GET {{SkillSnap.Api_HostAddress}}/api/projects
+Accept: application/json
+
+### Test Cache Invalidation - Create Project
+POST {{SkillSnap.Api_HostAddress}}/api/projects
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Test Cache Invalidation",
+  "description": "This should invalidate the projects cache",
+  "imageUrl": "https://via.placeholder.com/400x300",
+  "portfolioUserId": 1
+}
+
+### Test Cache After Invalidation (Should be Cache Miss again)
+GET {{SkillSnap.Api_HostAddress}}/api/projects
+Accept: application/json
+
+### ==================== ERROR TESTING ====================
+
+### Test 404 - Non-existent User
+GET {{SkillSnap.Api_HostAddress}}/api/portfoliousers/99999
+Accept: application/json
+
+### Test 401 - Unauthorized (No Token)
+POST {{SkillSnap.Api_HostAddress}}/api/projects
+Content-Type: application/json
+
+{
+  "title": "Unauthorized Test",
+  "description": "This should return 401",
+  "imageUrl": "https://via.placeholder.com/400x300",
+  "portfolioUserId": 1
+}
+
+### Test 400 - Invalid Data (Missing Required Fields)
+POST {{SkillSnap.Api_HostAddress}}/api/portfoliousers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "bio": "Missing name field"
+}
+
+###

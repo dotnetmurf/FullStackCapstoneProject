@@ -1,0 +1,48 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using SkillSnap.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inherits LayoutComponentBase
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="navbar-text text-black me-3">Hello, @context.User.Identity?.Name</span>
+                    <a href="#" 
+                       @onclick="HandleLogout" 
+                       @onclick:preventDefault
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="bottom" 
+                       title="Sign out and clear authentication token">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login"
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="bottom" 
+                       title="Sign in to manage your portfolio">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/");
+    }
+}

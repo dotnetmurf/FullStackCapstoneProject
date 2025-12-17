@@ -1,0 +1,23 @@
+@if (IsLoading)
+{
+    <div class="text-center my-4">
+        <div class="spinner-border text-primary" role="status" style="width: @Size; height: @Size;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <p class="mt-2 text-muted">@Message</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsLoading { get; set; } = true;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Size { get; set; } = "3rem";
+}

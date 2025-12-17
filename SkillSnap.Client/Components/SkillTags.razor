@@ -1,0 +1,70 @@
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@inject SkillService SkillService
+@inject NavigationManager Navigation
+@namespace SkillSnap.Client.Components
+
+<div class="skill-tags">
+    <h3>Skills</h3>
+
+    @if (isLoading)
+    {
+        <p><em>Loading skills...</em></p>
+    }
+    else if (skills == null || !skills.Any())
+    {
+        <p><em>No skills to display yet.</em></p>
+    }
+    else
+    {
+        <div class="tags-container">
+            @foreach (var skill in skills)
+            {
+                <div class="skill-badge-wrapper mb-2">
+                    <span class="badge bg-primary me-2">@skill.Name - @skill.Level</span>
+                    <button class="btn btn-sm btn-warning me-1" @onclick="() => EditSkill(skill.Id)">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteSkill(skill.Id)">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+</div>
+
+@code {
+    private List<Skill>? skills;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            skills = await SkillService.GetSkillsAsync();
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading skills: {ex.Message}";
+            isLoading = false;
+        }
+    }
+
+    private void EditSkill(int id)
+    {
+        Navigation.NavigateTo($"/edit-skill/{id}");
+    }
+
+    private void DeleteSkill(int id)
+    {
+        Navigation.NavigateTo($"/delete-skill/{id}");
+    }
+}

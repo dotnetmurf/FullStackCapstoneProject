@@ -1,0 +1,147 @@
+@page "/delete-skill/{Id:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@inject SkillService SkillService
+@inject NavigationManager Navigation
+
+<PageTitle>Delete Skill - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@(isLoading || isDeleting)" Message="@(isLoading ? "Loading skill..." : "Deleting skill...")" />
+
+<div class="container mt-4" style="@((isLoading || isDeleting) ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Delete Skill</h2>
+
+    @if (skill == null && !isLoading)
+    {
+        <div class="alert alert-warning">Skill not found.</div>
+        <button class="btn btn-secondary" @onclick="Cancel">Go Back</button>
+    }
+    else if (skill != null)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <h4 class="alert-heading">⚠️ Confirm Deletion</h4>
+            <p>Are you sure you want to delete this skill? <strong>This action cannot be undone.</strong></p>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header bg-danger text-white">
+                <h5>Skill to be deleted:</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-12 col-md-3">Skill ID:</dt>
+                    <dd class="col-12 col-md-9">@skill!.Id</dd>
+                    
+                    <dt class="col-12 col-md-3">Skill Name:</dt>
+                    <dd class="col-12 col-md-9"><h5><span class="badge bg-primary">@skill!.Name</span></h5></dd>
+                    
+                    <dt class="col-12 col-md-3">Proficiency Level:</dt>
+                    <dd class="col-12 col-md-9"><span class="badge bg-secondary">@skill!.Level</span></dd>
+                    
+                    <dt class="col-12 col-md-3">Portfolio User ID:</dt>
+                    <dd class="col-12 col-md-9">@skill!.PortfolioUserId</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="btn-group-responsive">
+            <button class="btn btn-danger" @onclick="HandleDelete" disabled="@isDeleting">
+                <i class="bi bi-trash me-1"></i>@(isDeleting ? "Deleting..." : "Yes, Delete Skill")
+            </button>
+            <button class="btn btn-secondary" @onclick="Cancel" disabled="@isDeleting">
+                <i class="bi bi-arrow-left me-1"></i>Cancel
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Skill? skill;
+    private bool isLoading = true;
+    private bool isDeleting = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSkill();
+    }
+
+    private async Task LoadSkill()
+    {
+        try
+        {
+            isLoading = true;
+            skill = await SkillService.GetSkillAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading skill: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        isDeleting = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await SkillService.DeleteSkillAsync(Id);
+            
+            if (result)
+            {
+                Navigation.NavigateTo($"/view-portfoliouser/{skill!.PortfolioUserId}");
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to delete this skill. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to delete this skill. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        if (skill != null)
+        {
+            Navigation.NavigateTo($"/view-portfoliouser/{skill.PortfolioUserId}");
+        }
+        else
+        {
+            Navigation.NavigateTo("/portfoliousers");
+        }
+    }
+}

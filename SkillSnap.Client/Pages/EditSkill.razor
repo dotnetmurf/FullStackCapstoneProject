@@ -1,0 +1,198 @@
+@page "/edit-skill/{Id:int}"
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@using SkillSnap.Client.Components
+@using Blazored.LocalStorage
+@inject SkillService SkillService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Edit Skill - SkillSnap</PageTitle>
+
+<LoadingSpinner IsLoading="@(isLoading || isSubmitting)" Message="@(isLoading ? "Loading skill..." : "Updating skill...")" />
+
+<div class="container mt-4" style="@((isLoading || isSubmitting) ? "opacity: 0.6; pointer-events: none;" : "")">
+    <h2>Edit Skill</h2>
+
+    @if (skill == null && !isLoading)
+    {
+        <div class="alert alert-warning">Skill not found.</div>
+        <button class="btn btn-secondary" @onclick="Cancel">Go Back</button>
+    }
+    else if (skill != null)
+    {
+        <EditForm Model="@skill" OnValidSubmit="@HandleSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="form-group mb-3">
+                <label for="name" class="form-label">Skill Name:</label>
+                <InputText id="name" class="form-control" @bind-Value="skill!.Name" @bind-Value:after="SaveDraft" placeholder="e.g., C#, JavaScript, Azure" />
+                <ValidationMessage For="@(() => skill.Name)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="level" class="form-label">Proficiency Level:</label>
+                <InputSelect id="level" class="form-control" @bind-Value="skill.Level" @bind-Value:after="SaveDraft">
+                    <option value="">-- Select Level --</option>
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                    <option value="Expert">Expert</option>
+                </InputSelect>
+                <ValidationMessage For="@(() => skill.Level)" />
+            </div>
+
+            <div class="btn-group-responsive">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    <i class="bi bi-check-circle me-1"></i>@(isSubmitting ? "Updating..." : "Update Skill")
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="async () => await Cancel()" disabled="@isSubmitting">
+                    <i class="bi bi-x-circle me-1"></i>Cancel
+                </button>
+            </div>
+        </EditForm>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong>Success:</strong> @successMessage
+                <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Skill? skill;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private string DraftKey => $"edit_skill_{Id}_draft";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSkill();
+        await RestoreDraft();
+    }
+
+    private async Task RestoreDraft()
+    {
+        try
+        {
+            var draft = await LocalStorage.GetItemAsync<Skill>(DraftKey);
+            if (draft != null && skill != null)
+            {
+                // Restore draft values
+                skill.Name = draft.Name;
+                skill.Level = draft.Level;
+            }
+        }
+        catch
+        {
+            // Ignore errors loading draft
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        if (skill != null)
+        {
+            try
+            {
+                await LocalStorage.SetItemAsync(DraftKey, skill);
+            }
+            catch
+            {
+                // Ignore errors saving draft
+            }
+        }
+    }
+
+    private async Task LoadSkill()
+    {
+        try
+        {
+            isLoading = true;
+            skill = await SkillService.GetSkillAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading skill: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (skill == null) return;
+
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await SkillService.UpdateSkillAsync(Id, skill);
+            
+            if (result)
+            {
+                successMessage = "Skill updated successfully!";
+                await LocalStorage.RemoveItemAsync(DraftKey); // Clear draft
+                await Task.Delay(1500); // Brief delay to show success message
+                Navigation.NavigateTo($"/view-portfoliouser/{skill.PortfolioUserId}");
+            }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "You are not authorized to update this skill. Please log in with an account that has the necessary permissions.";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "You do not have permission to update this skill. This operation requires administrator privileges.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Request failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await LocalStorage.RemoveItemAsync(DraftKey);
+        if (skill != null)
+        {
+            Navigation.NavigateTo($"/view-portfoliouser/{skill.PortfolioUserId}");
+        }
+        else
+        {
+            Navigation.NavigateTo("/portfoliousers");
+        }
+    }
+}

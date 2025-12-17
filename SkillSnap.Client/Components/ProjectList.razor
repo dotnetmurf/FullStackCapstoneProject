@@ -1,0 +1,79 @@
+@using SkillSnap.Shared.Models
+@using SkillSnap.Client.Services
+@inject ProjectService ProjectService
+@inject NavigationManager Navigation
+@namespace SkillSnap.Client.Components
+
+<div class="project-list">
+    <h3>My Projects</h3>
+
+    @if (isLoading)
+    {
+        <p><em>Loading projects...</em></p>
+    }
+    else if (projects == null || !projects.Any())
+    {
+        <p><em>No projects to display yet.</em></p>
+    }
+    else
+    {
+        <div class="project-grid">
+            @foreach (var project in projects)
+            {
+                <div class="project-card">
+                    <img src="@GetProjectImageUrl(project.ImageUrl)" alt="@project.Title" class="project-image" />
+                    <h4>@project.Title</h4>
+                    <p>@project.Description</p>
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-sm btn-outline-warning" @onclick="() => EditProject(project.Id)">
+                            Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteProject(project.Id)">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+</div>
+
+@code {
+    private List<Project>? projects;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            projects = await ProjectService.GetProjectsAsync();
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading projects: {ex.Message}";
+            isLoading = false;
+        }
+    }
+
+    private void EditProject(int id)
+    {
+        Navigation.NavigateTo($"/edit-project/{id}");
+    }
+
+    private void DeleteProject(int id)
+    {
+        Navigation.NavigateTo($"/delete-project/{id}");
+    }
+
+    private string GetProjectImageUrl(string? imageUrl)
+    {
+        return string.IsNullOrEmpty(imageUrl) ? "/images/default-project.svg" : imageUrl;
+    }
+}
